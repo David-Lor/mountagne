@@ -58,3 +58,8 @@ docker run -it --rm --privileged \
 -v "$(pwd)/sample.env:/settings.env" -e ENV_FILE=/settings.env \
 local/mountagne
 ```
+
+## TODO
+
+- Support mounting/unmounting on-demand (from an external source: MQTT, Redis, files?)
+- Add automated tests
