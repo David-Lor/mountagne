@@ -56,7 +56,7 @@ docker run -it --rm --privileged \
 -v /tmp/automount:/tmp/automount:rshared \
 -v /dev:/dev:ro \
 -v "$(pwd)/sample.env:/settings.env" -e ENV_FILE=/settings.env \
-local/mountagne
+ghcr.io/david-lor/mountagne:latest
 ```
 
 ## TODO
