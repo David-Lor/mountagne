@@ -26,7 +26,7 @@ Variables from the shell have more priority. Variables keys are case-insensitive
 Mountagne will fail to initialize if the settings are not valid (i.e. a required parameter is not passed, or a value has invalid data type or format).
 In this case, the error message will specify where exactly the problem is located.
 
-#### Example
+#### Configuration example
 
 Suppose we are using the following env file:
 
@@ -35,7 +35,6 @@ MOUNTPOINTS_BASE_DIR=/mnt/automount
 WATCH_DEV_DIR=/dev/disk/by-label
 FILTER_ALLOW='["USB*", "HDD*"]'
 FILTER_BLOCK='["HDD4T1"]'
-FILESYSTEM_TYPES_OVERRIDES='{"exfat": "exfat-fuse"}'
 ```
 
 First of all, the `WATCH_DEV_DIR` variable makes Mountagne to watch for changes in the `/dev/disk/by-label` directory.
@@ -50,6 +49,12 @@ However, remember that we are using filters (`FILTER_ALLOW` and `FILTER_BLOCK`).
 This partition can be mounted because its name matches the first filter in `FILTER_ALLOW`: `USB*`, which is wildcarded to match any partition name starting by `USB`;
 and the partition does not match any of the `FILTER_BLOCK` filters.
 
-Now imagine an `exfat` partition would be mounted by Mountagne, and our filesystem does not natively support this filesystem, so we install [exfat-fuse](https://github.com/relan/exfat).
-In this case, we have a problem: the filesystem type detected by Mountagne (which relies on blkid for retrieving this information) is `exfat`, but the `mount` command requires specifying the filesystem as `exfat-fuse` to make use of it.
-This is where we can configure the `FILESYSTEM_TYPES_OVERRIDES` to replace the filesystem type, replacing the original value of `exfat` by `exfat-fuse` when mounting the partition.
+### Running from Docker example
+
+```bash
+docker run -it --rm --privileged \
+-v /tmp/automount:/tmp/automount:rshared \
+-v /dev:/dev:ro \
+-v "$(pwd)/sample.env:/settings.env" -e ENV_FILE=/settings.env \
+local/mountagne
+```
