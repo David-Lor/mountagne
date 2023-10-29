@@ -40,6 +40,8 @@ jobs:
           for image_tag_version in $(echo "${{ github.event.inputs.image_tag_version }}" | sed "s/,/ /g")
           do
             IMAGE_TAG_FULL="${{ env.IMAGE_TAG_BASE }}:$image_tag_version"
+            echo "Tagging & Pushing image tag: $IMAGE_TAG_FULL"
+
             docker tag "${{ env.IMAGE_TAG_INTERNAL }}" "$IMAGE_TAG_FULL"
             docker push "$IMAGE_TAG_FULL"
           done
