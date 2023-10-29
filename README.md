@@ -59,7 +59,13 @@ docker run -it --rm --privileged \
 ghcr.io/david-lor/mountagne:latest
 ```
 
+## Changelog
+
+- v0.1
+  - Initial release
+
 ## TODO
 
 - Support mounting/unmounting on-demand (from an external source: MQTT, Redis, files?)
+- Standarize nomenclatures for device/disk/drive/partition
 - Add automated tests
