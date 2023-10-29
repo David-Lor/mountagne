@@ -10,6 +10,8 @@ import watchdog.observers
 import watchdog.observers.inotify
 import watchdog.observers.polling
 
+from . import comms
+from . import const
 from .logger import logger
 from .settings import settings
 
@@ -24,10 +26,15 @@ class App(watchdog.events.FileSystemEventHandler):
         self.blkid_installed = self.is_command_installed(settings.blkid_path)
 
         self.observer = watchdog.observers.inotify.InotifyObserver()
-        # self.observer = watchdog.observers.polling.PollingObserver()
-        # self.observer = watchdog.observers.Observer()
         self.observer_event_handler = self
         self.observer.schedule(self, settings.watch_dev_dir, recursive=False)
+
+        self.comms_services: list[comms.BaseComm] = list()
+        if settings.redis_enabled:
+            self.comms_services.append(comms.RedisComm())
+        for comm_service in self.comms_services:
+            comm_service.callbacks_message_received.append(self.cmd_callback)
+            comm_service.start()
 
         atexit.register(self.teardown)
 
@@ -46,6 +53,9 @@ class App(watchdog.events.FileSystemEventHandler):
         self.observer.stop()
         if settings.unmount_at_exit:
             self.unmount_all()
+
+        for comm_service in self.comms_services:
+            comm_service.stop()
 
         logger.info("Stopped")
 
@@ -174,18 +184,16 @@ class App(watchdog.events.FileSystemEventHandler):
                          f"overriden as {dev_override_fs_type}")
             return dev_override_fs_type
 
-    def file_watcher_callback(self, line: str, is_mount: bool):
-        if line.startswith("/"):
-            dev_path = pathlib.Path(line)
+    def cmd_callback(self, payload: const.CommandOperation):
+        if payload.device.startswith("/"):
+            dev_path = pathlib.Path(payload.device)
         else:
-            dev_path = pathlib.Path(settings.watch_dev_dir) / line
+            dev_path = pathlib.Path(settings.watch_dev_dir) / payload.device
         dev_name = dev_path.name
 
-        logger.info(f"Ondemand file received order for {'mounting' if is_mount else 'unmounting'} {dev_path}")
-
-        if is_mount:
+        if payload.operation == const.Operations.mount:
             self.process_device_connected(dev_path, dev_name)
-        else:
+        elif payload.operation == const.Operations.unmount:
             self.process_device_disconnected(dev_path, dev_name)
 
     @classmethod
