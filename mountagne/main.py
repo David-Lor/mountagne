@@ -103,6 +103,20 @@ class App(watchdog.events.FileSystemEventHandler):
         if self.unmount(dev_name):
             self.managed_devs.remove(dev_name)
 
+    def process_device_cmd_mount(self, dev_path: pathlib.Path, dev_name: str):
+        logger.debug(f"Received Mount command for device {dev_name}")
+        if dev_name in self.managed_devs:
+            logger.info(f"Device {dev_name} is already mounted")
+            return
+
+        if self.mount(dev_path, dev_name):
+            self.managed_devs.add(dev_name)
+
+    def process_device_cmd_unmount(self, dev_name: str):
+        logger.debug(f"Received Unmount command for device {dev_name}")
+        if self.unmount(dev_name):
+            self.managed_devs.remove(dev_name)
+
     def mount(self, dev_path: pathlib.Path, dev_name: str) -> bool:
         mount_path = self.get_mount_path(dev_name)
         logger.debug(f"Mounting device {dev_path} into {mount_path}...")
@@ -192,9 +206,9 @@ class App(watchdog.events.FileSystemEventHandler):
         dev_name = dev_path.name
 
         if payload.operation == const.Operations.mount:
-            self.process_device_connected(dev_path, dev_name)
+            self.process_device_cmd_mount(dev_path, dev_name)
         elif payload.operation == const.Operations.unmount:
-            self.process_device_disconnected(dev_path, dev_name)
+            self.process_device_cmd_unmount(dev_name)
 
     @classmethod
     def get_dev_filesystem_type(cls, dev_path: pathlib.Path) -> str | None:
