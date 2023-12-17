@@ -144,13 +144,12 @@ class App(watchdog.events.FileSystemEventHandler):
         logger.error(f"Device {dev_name} failed to be mounted in {mount_path} ({output})")
         return False
 
-    @classmethod
-    def unmount(cls, dev_name: str) -> bool:
+    def unmount(self, dev_name: str) -> bool:
         success = True
-        mount_path = cls.get_mount_path(dev_name)
+        mount_path = self.get_mount_path(dev_name)
         logger.debug(f"Unmounting device {dev_name} from {mount_path}...")
 
-        code, output = cls.exec(["umount", mount_path])
+        code, output = self.exec(["umount", mount_path])
         if code == 0:
             logger.info(f"Unmounted {dev_name} from {mount_path}")
         else:
@@ -199,10 +198,7 @@ class App(watchdog.events.FileSystemEventHandler):
             return dev_override_fs_type
 
     def cmd_callback(self, payload: const.CommandOperation):
-        if payload.device.startswith("/"):
-            dev_path = pathlib.Path(payload.device)
-        else:
-            dev_path = pathlib.Path(settings.watch_dev_dir) / payload.device
+        dev_path = pathlib.Path(settings.watch_dev_dir) / payload.device
         dev_name = dev_path.name
 
         if payload.operation == const.Operations.mount:
