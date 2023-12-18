@@ -100,3 +100,13 @@ Use the [Redis PUBLISH command](https://redis.io/commands/publish/) for sending 
 PUBLISH mountagne/cmd '{"operation": "mount", "device": "USB64G1"}'
 PUBLISH mountagne/cmd '{"operation": "unmount", "device": "USB64G1"}'
 ```
+
+## Changelog
+
+- v0.1
+  - Initial release
+
+## TODO
+
+- Standarize nomenclatures for device/disk/drive/partition
+- Add automated tests
