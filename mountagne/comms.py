@@ -6,9 +6,8 @@ import typing
 import redis
 
 from . import const
+from .logger import logger
 from .settings import settings
-
-# TODO Replace Prints with logger
 
 
 CallbackMsgReceived = typing.Callable[[const.CommandOperation], None]
@@ -29,7 +28,7 @@ class BaseComm(abc.ABC):
             try:
                 self._run_loop()
             except Exception as ex:
-                print("Exception on main loop:", ex)
+                logger.error(f"Exception in {self.__class__.__name__} loop: {ex.__class__.__name__}: {ex}")
                 self._stop_event.wait(5)
 
     @abc.abstractmethod
@@ -65,7 +64,7 @@ class RedisComm(BaseComm):
         )
         self.redis_pubsub = self.redis.pubsub()
         self.redis_pubsub.subscribe(settings.redis_topic_commands)
-        print("Redis start")
+        logger.info("Redis started")
 
     def _run_loop(self):
         try:
@@ -78,7 +77,7 @@ class RedisComm(BaseComm):
                     self._callback_message_received(data)
 
                 except Exception as ex:
-                    print(ex)
+                    logger.error(f"Exception processing Redis payload: {ex.__class__.__name__}: {ex}")
 
         except Exception as ex:
             # Ignore exceptions when closing mountagne
@@ -89,4 +88,4 @@ class RedisComm(BaseComm):
         with self.stop_ctx():
             self.redis_pubsub.close()
             self.redis.close()
-        print("Redis stopped")
+        logger.info("Redis stopped")
