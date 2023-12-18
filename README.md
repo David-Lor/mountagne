@@ -22,6 +22,13 @@ Variables from the shell have more priority. Variables keys are case-insensitive
 | `UNMOUNT_AT_EXIT`                | If true, unmount all the drives mounted by Mountagne when exiting.                                                                                                                                                                                            | `true`               |
 | `REMOVE_MOUNTDIRS_AFTER_UNMOUNT` | If true, directories created by Mountagne for automounting drives will be removed after the drive is unmounted.                                                                                                                                               | `true`               |
 | `BLKID_PATH`                     | Path or reference to the `blkid` binary.                                                                                                                                                                                                                      | `blkid`              |
+| Redis settings                   | Redis can optionally be used for sending mount/unmount commands                                                                                                                                                                                               |                      |
+| `REDIS_HOST`                     | Redis server hostname/IP; if not specified, Redis will not be used                                                                                                                                                                                            | None (optional)      |
+| `REDIS_PORT`                     | Redis server port                                                                                                                                                                                                                                             | `6379`               |
+| `REDIS_PASSWORD`                 | Redis server password, if any                                                                                                                                                                                                                                 | None (optional)      |
+| `REDIS_DB`                       | Redis database number                                                                                                                                                                                                                                         | `0`                  |
+| `REDIS_TOPIC_COMMANDS`           | Redis key for the topic where command payloads will be sent                                                                                                                                                                                                   | `mountagne/cmd`      |
+| `REDIS_KWARGS`                   | Additional kwargs to pass to the [Python Redis client](https://redis-py.readthedocs.io/en/stable/connections.html#generic-client). Must be a map/object/dictionary in JSON format.                                                                            | `{}` (none)          |
 
 Mountagne will fail to initialize if the settings are not valid (i.e. a required parameter is not passed, or a value has invalid data type or format).
 In this case, the error message will specify where exactly the problem is located.
@@ -59,7 +66,37 @@ docker run -it --rm --privileged \
 ghcr.io/david-lor/mountagne:latest
 ```
 
-## TODO
+### Redis support
 
-- Support mounting/unmounting on-demand (from an external source: MQTT, Redis, files?)
-- Add automated tests
+Mountagne supports receiving commands for mounting and unmounting devices, read from a Redis topic (see [Redis Pub/Sub](https://redis.io/docs/interact/pubsub/)).
+Topic key is configured by the `REDIS_TOPIC_COMMANDS` setting. Payload is a JSON object with the following entries:
+
+| Key         | Description                                                                    |
+|-------------|--------------------------------------------------------------------------------|
+| `operation` | Either `mount` or `unmount`.                                                   |
+| `device`    | Device name to mount or unmount. Device must be present on the `WATCH_DEV_DIR` |
+
+For example, this payload would mount a device named `USB64G1`:
+
+```json
+{
+  "operation": "mount",
+  "device": "USB64G1"
+}
+```
+
+And this payload would unmount it:
+
+```json
+{
+  "operation": "unmount",
+  "device": "USB64G1"
+}
+```
+
+Use the [Redis PUBLISH command](https://redis.io/commands/publish/) for sending messages:
+
+```redis
+PUBLISH mountagne/cmd '{"operation": "mount", "device": "USB64G1"}'
+PUBLISH mountagne/cmd '{"operation": "unmount", "device": "USB64G1"}'
+```
