@@ -8,6 +8,8 @@ import redis
 from . import const
 from .settings import settings
 
+# TODO Replace Prints with logger
+
 
 CallbackMsgReceived = typing.Callable[[const.CommandOperation], None]
 
@@ -24,14 +26,18 @@ class BaseComm(abc.ABC):
 
     def run(self):
         while not self._stop_event.is_set():
-            self._run_loop()
+            try:
+                self._run_loop()
+            except Exception as ex:
+                print("Exception on main loop:", ex)
+                self._stop_event.wait(5)
 
     @abc.abstractmethod
     def _run_loop(self):
         pass
 
     def stop(self):
-        with self.stop_ctx:
+        with self.stop_ctx():
             pass
 
     @contextlib.contextmanager
@@ -62,20 +68,25 @@ class RedisComm(BaseComm):
         print("Redis start")
 
     def _run_loop(self):
-        for message in self.redis_pubsub.listen():
-            try:
-                data = message.get("data")
-                if not isinstance(data, bytes):
-                    continue
+        try:
+            for message in self.redis_pubsub.listen():
+                try:
+                    data = message.get("data")
+                    if not isinstance(data, bytes):
+                        continue
 
-                self._callback_message_received(data)
+                    self._callback_message_received(data)
 
-            except Exception as ex:
-                print(ex)
+                except Exception as ex:
+                    print(ex)
+
+        except Exception as ex:
+            # Ignore exceptions when closing mountagne
+            if not self._stop_event.is_set():
+                raise ex
 
     def stop(self):
         with self.stop_ctx():
-            # TODO main loop failing on close
             self.redis_pubsub.close()
             self.redis.close()
-        print("Redis stop")
+        print("Redis stopped")
