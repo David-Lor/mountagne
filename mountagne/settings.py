@@ -1,9 +1,10 @@
 import os
 import pathlib
 
+import pydantic
 import pydantic_settings
 
-ENV_FILE = os.getenv("ENV_FILE")
+ENV_FILE = os.getenv("ENV_FILE", ".env")
 
 
 class Settings(pydantic_settings.BaseSettings):
@@ -18,6 +19,17 @@ class Settings(pydantic_settings.BaseSettings):
     unmount_at_exit: bool = True
     remove_mountdirs_after_unmount: bool = True
     blkid_path: str = "blkid"
+
+    redis_host: str | None = None
+    redis_port: int = 6379
+    redis_password: pydantic.SecretStr | None = None
+    redis_db: int = 0
+    redis_topic_commands: str = "mountagne/cmd"
+    redis_kwargs: dict = {}
+
+    @property
+    def redis_enabled(self):
+        return bool(self.redis_host)
 
 
 settings = Settings()

@@ -10,6 +10,8 @@ import watchdog.observers
 import watchdog.observers.inotify
 import watchdog.observers.polling
 
+from . import comms
+from . import const
 from .logger import logger
 from .settings import settings
 
@@ -24,10 +26,15 @@ class App(watchdog.events.FileSystemEventHandler):
         self.blkid_installed = self.is_command_installed(settings.blkid_path)
 
         self.observer = watchdog.observers.inotify.InotifyObserver()
-        # self.observer = watchdog.observers.polling.PollingObserver()
-        # self.observer = watchdog.observers.Observer()
         self.observer_event_handler = self
         self.observer.schedule(self, settings.watch_dev_dir, recursive=False)
+
+        self.comms_services: list[comms.BaseComm] = list()
+        if settings.redis_enabled:
+            self.comms_services.append(comms.RedisComm())
+        for comm_service in self.comms_services:
+            comm_service.callbacks_message_received.append(self.cmd_callback)
+            comm_service.start()
 
         atexit.register(self.teardown)
 
@@ -46,6 +53,9 @@ class App(watchdog.events.FileSystemEventHandler):
         self.observer.stop()
         if settings.unmount_at_exit:
             self.unmount_all()
+
+        for comm_service in self.comms_services:
+            comm_service.stop()
 
         logger.info("Stopped")
 
@@ -93,6 +103,20 @@ class App(watchdog.events.FileSystemEventHandler):
         if self.unmount(dev_name):
             self.managed_devs.remove(dev_name)
 
+    def process_device_cmd_mount(self, dev_path: pathlib.Path, dev_name: str):
+        logger.debug(f"Received Mount command for device {dev_name}")
+        if dev_name in self.managed_devs:
+            logger.info(f"Device {dev_name} is already mounted")
+            return
+
+        if self.mount(dev_path, dev_name):
+            self.managed_devs.add(dev_name)
+
+    def process_device_cmd_unmount(self, dev_name: str):
+        logger.debug(f"Received Unmount command for device {dev_name}")
+        if self.unmount(dev_name):
+            self.managed_devs.remove(dev_name)
+
     def mount(self, dev_path: pathlib.Path, dev_name: str) -> bool:
         mount_path = self.get_mount_path(dev_name)
         logger.debug(f"Mounting device {dev_path} into {mount_path}...")
@@ -120,13 +144,12 @@ class App(watchdog.events.FileSystemEventHandler):
         logger.error(f"Device {dev_name} failed to be mounted in {mount_path} ({output})")
         return False
 
-    @classmethod
-    def unmount(cls, dev_name: str) -> bool:
+    def unmount(self, dev_name: str) -> bool:
         success = True
-        mount_path = cls.get_mount_path(dev_name)
+        mount_path = self.get_mount_path(dev_name)
         logger.debug(f"Unmounting device {dev_name} from {mount_path}...")
 
-        code, output = cls.exec(["umount", mount_path])
+        code, output = self.exec(["umount", mount_path])
         if code == 0:
             logger.info(f"Unmounted {dev_name} from {mount_path}")
         else:
@@ -174,19 +197,14 @@ class App(watchdog.events.FileSystemEventHandler):
                          f"overriden as {dev_override_fs_type}")
             return dev_override_fs_type
 
-    def file_watcher_callback(self, line: str, is_mount: bool):
-        if line.startswith("/"):
-            dev_path = pathlib.Path(line)
-        else:
-            dev_path = pathlib.Path(settings.watch_dev_dir) / line
+    def cmd_callback(self, payload: const.CommandOperation):
+        dev_path = pathlib.Path(settings.watch_dev_dir) / payload.device
         dev_name = dev_path.name
 
-        logger.info(f"Ondemand file received order for {'mounting' if is_mount else 'unmounting'} {dev_path}")
-
-        if is_mount:
-            self.process_device_connected(dev_path, dev_name)
-        else:
-            self.process_device_disconnected(dev_path, dev_name)
+        if payload.operation == const.Operations.mount:
+            self.process_device_cmd_mount(dev_path, dev_name)
+        elif payload.operation == const.Operations.unmount:
+            self.process_device_cmd_unmount(dev_name)
 
     @classmethod
     def get_dev_filesystem_type(cls, dev_path: pathlib.Path) -> str | None:
