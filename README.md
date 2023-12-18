@@ -103,6 +103,8 @@ PUBLISH mountagne/cmd '{"operation": "unmount", "device": "USB64G1"}'
 
 ## Changelog
 
+- v0.2
+  - Support mounting/unmounting with commands from Redis
 - v0.1
   - Initial release
 
