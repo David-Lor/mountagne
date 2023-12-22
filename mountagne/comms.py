@@ -3,8 +3,6 @@ import contextlib
 import threading
 import typing
 
-import redis
-
 from . import const
 from .logger import logger
 from .settings import settings
@@ -55,6 +53,8 @@ class RedisComm(BaseComm):
 
     def __init__(self):
         super().__init__()
+
+        import redis
         self.redis = redis.Redis(
             host=settings.redis_host,
             port=settings.redis_port,
@@ -62,6 +62,7 @@ class RedisComm(BaseComm):
             db=settings.redis_db,
             **settings.redis_kwargs,
         )
+
         self.redis_pubsub = self.redis.pubsub()
         self.redis_pubsub.subscribe(settings.redis_topic_commands)
         logger.info("Redis started")
