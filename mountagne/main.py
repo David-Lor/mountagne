@@ -32,6 +32,9 @@ class App(watchdog.events.FileSystemEventHandler):
         self.comms_services: list[comms.BaseComm] = list()
         if settings.redis_enabled:
             self.comms_services.append(comms.RedisComm())
+        if settings.rest_enabled:
+            self.comms_services.append(comms.RestComm())
+
         for comm_service in self.comms_services:
             comm_service.callbacks_message_received.append(self.cmd_callback)
             comm_service.start()
@@ -104,6 +107,7 @@ class App(watchdog.events.FileSystemEventHandler):
             self.managed_devs.remove(dev_name)
 
     def process_device_cmd_mount(self, dev_path: pathlib.Path, dev_name: str):
+        # TODO Return result (OK/KO and message) for HTTP Responses
         logger.debug(f"Received Mount command for device {dev_name}")
         if dev_name in self.managed_devs:
             logger.info(f"Device {dev_name} is already mounted")

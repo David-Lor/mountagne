@@ -27,9 +27,17 @@ class Settings(pydantic_settings.BaseSettings):
     redis_topic_commands: str = "mountagne/cmd"
     redis_kwargs: dict = {}
 
+    http_port: int | None = None
+    http_host: str = "0.0.0.0"
+    http_server_name: str = "Mountagne"
+
     @property
     def redis_enabled(self):
         return bool(self.redis_host)
+
+    @property
+    def rest_enabled(self):
+        return bool(self.http_port)
 
 
 settings = Settings()
