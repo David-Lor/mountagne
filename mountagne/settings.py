@@ -29,7 +29,7 @@ class Settings(pydantic_settings.BaseSettings):
 
     http_port: int | None = None
     http_host: str = "0.0.0.0"
-    http_server_name: str = "Mountagne"
+    http_app_name: str = "Mountagne"
 
     @property
     def redis_enabled(self):

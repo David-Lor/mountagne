@@ -111,7 +111,7 @@ class RestComm(BaseComm):
         self.devices_cache: const.DevicesSet = set()
         self.fastapi = fastapi
         self.app = fastapi.FastAPI(
-            title=settings.http_server_name,
+            title=settings.http_app_name,
         )
 
         # TODO Create a wrapper logger to send uvicorn logs to mountagne logger
