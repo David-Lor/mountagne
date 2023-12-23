@@ -3,7 +3,7 @@ import contextlib
 import threading
 import typing
 
-import redis
+import pydantic
 
 from . import const
 from .logger import logger
@@ -45,16 +45,23 @@ class BaseComm(abc.ABC):
         yield
         self._thread.join()
 
-    def _callback_message_received(self, data: str | bytes):
-        payload = const.CommandOperation.model_validate_json(data)
+    def callback_devices_changed(self, devices_now: const.DevicesSet):
+        pass
+
+    def _callback_message_received(self, data: str | bytes | const.CommandOperation):
+        if not isinstance(data, const.CommandOperation):
+            data = const.CommandOperation.model_validate_json(data)
+
         for callback in self.callbacks_message_received:
-            callback(payload)
+            callback(data)
 
 
 class RedisComm(BaseComm):
 
     def __init__(self):
         super().__init__()
+
+        import redis
         self.redis = redis.Redis(
             host=settings.redis_host,
             port=settings.redis_port,
@@ -62,6 +69,7 @@ class RedisComm(BaseComm):
             db=settings.redis_db,
             **settings.redis_kwargs,
         )
+
         self.redis_pubsub = self.redis.pubsub()
         self.redis_pubsub.subscribe(settings.redis_topic_commands)
         logger.info("Redis started")
@@ -89,3 +97,87 @@ class RedisComm(BaseComm):
             self.redis_pubsub.close()
             self.redis.close()
         logger.info("Redis stopped")
+
+
+class RestComm(BaseComm):
+
+    def __init__(self):
+        super().__init__()
+
+        import asyncio
+        import uvicorn
+        import fastapi
+
+        self.devices_cache: const.DevicesSet = set()
+        self.fastapi = fastapi
+        self.app = fastapi.FastAPI(
+            title=settings.http_app_name,
+        )
+
+        # TODO Create a wrapper logger to send uvicorn logs to mountagne logger
+        #   https://github.com/tiangolo/fastapi/discussions/7457#discussioncomment-5141102
+        config = uvicorn.Config(
+            app=self.app,
+            host=settings.http_host,
+            port=settings.http_port,
+        )
+        config.setup_event_loop()
+
+        self._setup_endpoints()
+        self.server = uvicorn.Server(config=config)
+        self.loop = asyncio.get_event_loop()
+
+    def _run_loop(self):
+        try:
+            self.loop.run_until_complete(self.server.serve())
+        except RuntimeError as ex:
+            if "Event loop stopped before Future completed" not in str(ex):
+                raise ex
+
+    def stop(self):
+        with self.stop_ctx():
+            self.loop.stop()
+        logger.info("REST Server closed")
+
+    def callback_devices_changed(self, devices_now: const.DevicesSet):
+        self.devices_cache = devices_now
+
+    def _setup_endpoints(self):
+        @self.app.post("/mount/{device_name}")
+        def mount(device_name: str):
+            return self._operation_handler(operation=const.Operations.mount, device_name=device_name)
+
+        @self.app.post("/unmount/{device_name}")
+        def unmount(device_name: str):
+            return self._operation_handler(operation=const.Operations.unmount, device_name=device_name)
+
+        @self.app.get("/devices")
+        def get_devices():
+            return self.DevicesResponse(devices=self.devices_cache)
+
+    class OperationResponse(pydantic.BaseModel):
+        success: bool
+        message: str = ""
+
+    class DevicesResponse(pydantic.BaseModel):
+        devices: const.DevicesSet
+
+    def _operation_handler(self, operation: const.Operations, device_name: str):
+        import fastapi
+
+        data = const.CommandOperation(
+            operation=operation,
+            device=device_name,
+        )
+
+        try:
+            self._callback_message_received(data)
+            response_body = self.OperationResponse(success=True)
+            return fastapi.responses.JSONResponse(status_code=200, content=response_body.model_dump())
+
+        except Exception as ex:
+            response_body = self.OperationResponse(
+                success=False,
+                message=f"{ex.__class__.__name__}: {ex}"
+            )
+            return fastapi.responses.JSONResponse(status_code=500, content=response_body.model_dump())
