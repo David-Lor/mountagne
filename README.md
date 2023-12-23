@@ -138,6 +138,10 @@ If the HTTP server is enabled, you can see all the endpoints available in the au
 
 ## Changelog
 
+- v0.3
+  - Add HTTP REST API server support, for mounting/unmounting and getting the currently mounted devices
+  - Send updates on currently mounted devices to Redis topic
+  - BREAKING: the REDIS_TOPIC_COMMANDS config param is now optional; not providing it will not listen to any commands
 - v0.2
   - Support mounting/unmounting with commands from Redis
 - v0.1
