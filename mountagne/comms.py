@@ -1,6 +1,7 @@
 import abc
 import contextlib
 import threading
+import json
 import typing
 
 import pydantic
@@ -70,11 +71,18 @@ class RedisComm(BaseComm):
             **settings.redis_kwargs,
         )
 
-        self.redis_pubsub = self.redis.pubsub()
-        self.redis_pubsub.subscribe(settings.redis_topic_commands)
+        self.redis_pubsub = None
+        if topic := settings.redis_topic_commands:
+            self.redis_pubsub = self.redis.pubsub()
+            self.redis_pubsub.subscribe(topic)
+            logger.debug(f"Redis listening to commands (topic={topic})")
+
         logger.info("Redis started")
 
     def _run_loop(self):
+        if not self.redis_pubsub:
+            self._stop_event.wait()
+
         try:
             for message in self.redis_pubsub.listen():
                 try:
@@ -92,9 +100,26 @@ class RedisComm(BaseComm):
             if not self._stop_event.is_set():
                 raise ex
 
+    def callback_devices_changed(self, devices_now: const.DevicesSet):
+        topic = settings.redis_topic_status
+        if not topic:
+            return
+
+        try:
+            data = json.dumps({"devices": list(devices_now)})
+            logger.debug(f"Redis publish (topic={topic}): {data}")
+            self.redis.publish(
+                channel=topic,
+                message=data,
+            )
+
+        except Exception as ex:
+            logger.warning(f"Exception publishing Redis: {ex.__class__.__name__}: {ex}")
+
     def stop(self):
         with self.stop_ctx():
-            self.redis_pubsub.close()
+            if self.redis_pubsub:
+                self.redis_pubsub.close()
             self.redis.close()
         logger.info("Redis stopped")
 
@@ -137,7 +162,7 @@ class RestComm(BaseComm):
     def stop(self):
         with self.stop_ctx():
             self.loop.stop()
-        logger.info("REST Server closed")
+        logger.info("REST Server stopped")
 
     def callback_devices_changed(self, devices_now: const.DevicesSet):
         self.devices_cache = devices_now

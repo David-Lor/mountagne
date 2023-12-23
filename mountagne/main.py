@@ -96,6 +96,7 @@ class App(watchdog.events.FileSystemEventHandler):
         logger.info(f"Device {dev_name} connected, mounting...")
         if self.mount(dev_path, dev_name):
             self.managed_devs.add(dev_name)
+            self.devices_change_callback()
 
     def process_device_disconnected(self, dev_path: pathlib.Path, dev_name: str):
         if dev_name not in self.managed_devs:
@@ -105,6 +106,7 @@ class App(watchdog.events.FileSystemEventHandler):
         logger.info(f"Device {dev_name} disconnected, unmounting...")
         if self.unmount(dev_name):
             self.managed_devs.remove(dev_name)
+            self.devices_change_callback()
 
     def process_device_cmd_mount(self, dev_path: pathlib.Path, dev_name: str):
         # TODO Return result (OK/KO and message) for HTTP Responses
@@ -115,11 +117,13 @@ class App(watchdog.events.FileSystemEventHandler):
 
         if self.mount(dev_path, dev_name):
             self.managed_devs.add(dev_name)
+            self.devices_change_callback()
 
     def process_device_cmd_unmount(self, dev_name: str):
         logger.debug(f"Received Unmount command for device {dev_name}")
         if self.unmount(dev_name):
             self.managed_devs.remove(dev_name)
+            self.devices_change_callback()
 
     def mount(self, dev_path: pathlib.Path, dev_name: str) -> bool:
         mount_path = self.get_mount_path(dev_name)
@@ -143,7 +147,6 @@ class App(watchdog.events.FileSystemEventHandler):
         code, output = self.exec(cmd)
         if code == 0:
             logger.info(f"Device {dev_name} successfully mounted in {mount_path}")
-            self.devices_change_callback()
             return True
 
         logger.error(f"Device {dev_name} failed to be mounted in {mount_path} ({output})")
@@ -172,7 +175,6 @@ class App(watchdog.events.FileSystemEventHandler):
             except Exception as ex:
                 logger.warning(f"Failed removing mountpoint directory {mount_path} ({ex})")
 
-        self.devices_change_callback()
         return success
 
     @staticmethod

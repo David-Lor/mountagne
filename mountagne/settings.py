@@ -24,7 +24,8 @@ class Settings(pydantic_settings.BaseSettings):
     redis_port: int = 6379
     redis_password: pydantic.SecretStr | None = None
     redis_db: int = 0
-    redis_topic_commands: str = "mountagne/cmd"
+    redis_topic_commands: str | None = None
+    redis_topic_status: str | None = None
     redis_kwargs: dict = {}
 
     http_port: int | None = None

@@ -22,17 +22,18 @@ Variables from the shell have more priority. Variables keys are case-insensitive
 | `UNMOUNT_AT_EXIT`                | If true, unmount all the drives mounted by Mountagne when exiting.                                                                                                                                                                                            | `true`                          |
 | `REMOVE_MOUNTDIRS_AFTER_UNMOUNT` | If true, directories created by Mountagne for automounting drives will be removed after the drive is unmounted.                                                                                                                                               | `true`                          |
 | `BLKID_PATH`                     | Path or reference to the `blkid` binary.                                                                                                                                                                                                                      | `blkid`                         |
-| Redis settings                   | Redis can optionally be used for sending mount/unmount commands                                                                                                                                                                                               |                                 |
-| `REDIS_HOST`                     | Redis server hostname/IP; if not specified, Redis will not be used                                                                                                                                                                                            | None (optional)                 |
-| `REDIS_PORT`                     | Redis server port                                                                                                                                                                                                                                             | `6379`                          |
-| `REDIS_PASSWORD`                 | Redis server password, if any                                                                                                                                                                                                                                 | None (optional)                 |
-| `REDIS_DB`                       | Redis database number                                                                                                                                                                                                                                         | `0`                             |
-| `REDIS_TOPIC_COMMANDS`           | Redis key for the topic where command payloads will be sent                                                                                                                                                                                                   | `mountagne/cmd`                 |
+| Redis settings                   | Redis can optionally be used for sending mount/unmount commands.                                                                                                                                                                                              |                                 |
+| `REDIS_HOST`                     | Redis server hostname/IP; if not specified, Redis will not be used.                                                                                                                                                                                           | None (optional)                 |
+| `REDIS_PORT`                     | Redis server port.                                                                                                                                                                                                                                            | `6379`                          |
+| `REDIS_PASSWORD`                 | Redis server password, if any.                                                                                                                                                                                                                                | None (optional)                 |
+| `REDIS_DB`                       | Redis database number.                                                                                                                                                                                                                                        | `0`                             |
+| `REDIS_TOPIC_COMMANDS`           | Redis key for the topic where command payloads will be read from; if not specified, will not be supported.                                                                                                                                                    | None (optional)                 |
+| `REDIS_TOPIC_STATUS`             | Redis key for the topic where status updates will be sent to; if not specified, will not be supported.                                                                                                                                                        | None (optional)                 |
 | `REDIS_KWARGS`                   | Additional kwargs to pass to the [Python Redis client](https://redis-py.readthedocs.io/en/stable/connections.html#generic-client). Must be a map/object/dictionary in JSON format.                                                                            | `{}` (none)                     |
-| REST API settings                | An HTTP REST API can optionally be served for sending mount/unmount commands via HTTP                                                                                                                                                                         |                                 |
-| `HTTP_PORT`                      | Port for the HTTP server; if not specified, the REST API server will not be used                                                                                                                                                                              |                                 |
-| `HTTP_HOST`                      | Host (IP) where the HTTP server will listen to                                                                                                                                                                                                                | `0.0.0.0` (bind all interfaces) |
-| `HTTP_APP_NAME`                  | Name of the app (shown on auto-generated docs)                                                                                                                                                                                                                |                                 |
+| REST API settings                | An HTTP REST API can optionally be served for sending mount/unmount commands via HTTP.                                                                                                                                                                        |                                 |
+| `HTTP_PORT`                      | Port for the HTTP server; if not specified, the REST API server will not be used.                                                                                                                                                                             |                                 |
+| `HTTP_HOST`                      | Host (IP) where the HTTP server will listen to.                                                                                                                                                                                                               | `0.0.0.0` (bind all interfaces) |
+| `HTTP_APP_NAME`                  | Name of the app (shown on auto-generated docs).                                                                                                                                                                                                               |                                 |
 
 Mountagne will fail to initialize if the settings are not valid (i.e. a required parameter is not passed, or a value has invalid data type or format).
 In this case, the error message will specify where exactly the problem is located.
@@ -118,6 +119,16 @@ Use the [Redis PUBLISH command](https://redis.io/commands/publish/) for sending 
 ```redis
 PUBLISH mountagne/cmd '{"operation": "mount", "device": "USB64G1"}'
 PUBLISH mountagne/cmd '{"operation": "unmount", "device": "USB64G1"}'
+```
+
+#### Redis updates
+
+When any device gets mounted or unmounted, Mountagne will send a message to the `REDIS_TOPIC_STATUS` with the following format:
+
+```json
+{
+  "devices": ["USB64G1", "USB64G2"]
+}
 ```
 
 ### HTTP REST API support
