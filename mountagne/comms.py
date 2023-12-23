@@ -45,6 +45,9 @@ class BaseComm(abc.ABC):
         yield
         self._thread.join()
 
+    def callback_devices_changed(self, devices_now: const.DevicesSet):
+        pass
+
     def _callback_message_received(self, data: str | bytes | const.CommandOperation):
         if not isinstance(data, const.CommandOperation):
             data = const.CommandOperation.model_validate_json(data)
@@ -105,6 +108,7 @@ class RestComm(BaseComm):
         import uvicorn
         import fastapi
 
+        self.devices_cache: const.DevicesSet = set()
         self.fastapi = fastapi
         self.app = fastapi.FastAPI(
             title=settings.http_server_name,
@@ -135,6 +139,9 @@ class RestComm(BaseComm):
             self.loop.stop()
         logger.info("REST Server closed")
 
+    def callback_devices_changed(self, devices_now: const.DevicesSet):
+        self.devices_cache = devices_now
+
     def _setup_endpoints(self):
         @self.app.post("/mount/{device_name}")
         def mount(device_name: str):
@@ -144,9 +151,16 @@ class RestComm(BaseComm):
         def unmount(device_name: str):
             return self._operation_handler(operation=const.Operations.unmount, device_name=device_name)
 
+        @self.app.get("/devices")
+        def get_devices():
+            return self.DevicesResponse(devices=self.devices_cache)
+
     class OperationResponse(pydantic.BaseModel):
         success: bool
         message: str = ""
+
+    class DevicesResponse(pydantic.BaseModel):
+        devices: const.DevicesSet
 
     def _operation_handler(self, operation: const.Operations, device_name: str):
         import fastapi

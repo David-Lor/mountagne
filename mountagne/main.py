@@ -22,7 +22,7 @@ def main():
 
 class App(watchdog.events.FileSystemEventHandler):
     def __init__(self):
-        self.managed_devs: set[str] = set()  # devices names (names of directories from watchdir, usually labels)
+        self.managed_devs: const.DevicesSet = set()  # devs names (names of directories from watchdir, usually labels)
         self.blkid_installed = self.is_command_installed(settings.blkid_path)
 
         self.observer = watchdog.observers.inotify.InotifyObserver()
@@ -143,6 +143,7 @@ class App(watchdog.events.FileSystemEventHandler):
         code, output = self.exec(cmd)
         if code == 0:
             logger.info(f"Device {dev_name} successfully mounted in {mount_path}")
+            self.devices_change_callback()
             return True
 
         logger.error(f"Device {dev_name} failed to be mounted in {mount_path} ({output})")
@@ -171,6 +172,7 @@ class App(watchdog.events.FileSystemEventHandler):
             except Exception as ex:
                 logger.warning(f"Failed removing mountpoint directory {mount_path} ({ex})")
 
+        self.devices_change_callback()
         return success
 
     @staticmethod
@@ -209,6 +211,14 @@ class App(watchdog.events.FileSystemEventHandler):
             self.process_device_cmd_mount(dev_path, dev_name)
         elif payload.operation == const.Operations.unmount:
             self.process_device_cmd_unmount(dev_name)
+
+    def devices_change_callback(self):
+        for service in self.comms_services:
+            try:
+                service.callback_devices_changed(self.managed_devs)
+            except Exception as ex:
+                logger.warning(f"Failed calling devices-changed callback for {service.__class__.__name__}: "
+                               f"{ex.__class__.__name__}: {ex}")
 
     @classmethod
     def get_dev_filesystem_type(cls, dev_path: pathlib.Path) -> str | None:
